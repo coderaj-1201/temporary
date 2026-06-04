@@ -1,20 +1,24 @@
 """
-Azure client factories for the ingestion pipeline.
-- Foundry + Blob + Service Bus: fully keyless (Managed Identity / CLI)
-- Document Intelligence + AI Search: API key (keyless not universally available for DI)
+Azure client factories — ingestion pipeline.
+
+Auth:
+  - Foundry / OpenAI : AzureCliCredential locally, ManagedIdentity in ACA
+  - AI Search        : API key (Contributor access is enough locally)
+  - Blob Storage     : AzureCliCredential / ManagedIdentity
+  - Service Bus      : connection string locally, ManagedIdentity in ACA
+
+No Document Intelligence — PDF parsing is done natively with pdfplumber + pymupdf.
 """
 from __future__ import annotations
 
 import os
 from functools import lru_cache
 
-from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.ai.projects import AIProjectClient
 from azure.core.credentials import AzureKeyCredential
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
-from azure.servicebus import ServiceBusClient
 from azure.storage.blob import BlobServiceClient
 from openai import AzureOpenAI
 
@@ -43,18 +47,7 @@ def get_openai_client() -> AzureOpenAI:
 
 
 @lru_cache(maxsize=1)
-def get_document_intelligence_client() -> DocumentIntelligenceClient:
-    return DocumentIntelligenceClient(
-        endpoint=str(settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT),
-        credential=AzureKeyCredential(
-            settings.AZURE_DOCUMENT_INTELLIGENCE_KEY.get_secret_value()
-        ),
-    )
-
-
-@lru_cache(maxsize=1)
 def get_blob_service_client() -> BlobServiceClient:
-    """Sync blob client for non-async contexts. Use AsyncBlobClient directly in agents."""
     return BlobServiceClient(
         account_url=f"https://{settings.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net",
         credential=_credential(),
@@ -82,18 +75,17 @@ def get_search_index_client() -> SearchIndexClient:
     )
 
 
-def get_service_bus_client() -> ServiceBusClient:
-    """New instance per use — context manager. Prefers keyless auth."""
-    if os.getenv("RUNNING_IN_AZURE"):
-        return ServiceBusClient(
-            fully_qualified_namespace=settings.AZURE_SERVICE_BUS_NAMESPACE,
-            credential=ManagedIdentityCredential(),
-        )
-    if settings.AZURE_SERVICE_BUS_CONNECTION_STR:
-        return ServiceBusClient.from_connection_string(
-            settings.AZURE_SERVICE_BUS_CONNECTION_STR.get_secret_value()
-        )
-    return ServiceBusClient(
+def get_service_bus_client():
+    """New instance per use — always use as async context manager."""
+    from azure.servicebus.aio import ServiceBusClient as AsyncSBClient
+    conn_str = (
+        settings.AZURE_SERVICE_BUS_CONNECTION_STR.get_secret_value()
+        if settings.AZURE_SERVICE_BUS_CONNECTION_STR
+        else None
+    )
+    if conn_str:
+        return AsyncSBClient.from_connection_string(conn_str)
+    return AsyncSBClient(
         fully_qualified_namespace=settings.AZURE_SERVICE_BUS_NAMESPACE,
-        credential=AzureCliCredential(),
+        credential=_credential(),
     )

@@ -1,7 +1,6 @@
 """
 Ingestion pipeline settings.
-API key for Search + DI (keyless not available for DI in all regions).
-Foundry via AzureCliCredential locally.
+No Document Intelligence — PDF parsing uses pdfplumber + pymupdf + LLM.
 """
 from __future__ import annotations
 
@@ -23,12 +22,8 @@ class Settings(BaseSettings):
     AZURE_FOUNDRY_PROJECT_ENDPOINT: AnyHttpUrl
     AZURE_OPENAI_EMBEDDING_DEPLOYMENT: str  = "text-embedding-ada-002"
     AZURE_OPENAI_API_VERSION: str           = "2024-08-01-preview"
-    # Light LLM for page cleaning / table serialisation — phi-3-mini or gpt-4o-mini
+    # Light LLM for page cleaning + table serialisation — gpt-4o-mini or phi-3-mini
     AZURE_OPENAI_LIGHT_LLM_DEPLOYMENT: str  = "gpt-4o-mini"
-
-    # ── Azure Document Intelligence ───────────────────────────────────────────
-    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: AnyHttpUrl
-    AZURE_DOCUMENT_INTELLIGENCE_KEY: SecretStr
 
     # ── Azure Blob Storage ────────────────────────────────────────────────────
     AZURE_STORAGE_ACCOUNT_NAME: str
@@ -42,9 +37,8 @@ class Settings(BaseSettings):
     AZURE_SEARCH_SEMANTIC_CONFIG: str       = "rag-semantic-config"
 
     # ── Azure Service Bus ─────────────────────────────────────────────────────
-    # Use connection string locally; Managed Identity in containers
-    AZURE_SERVICE_BUS_CONNECTION_STR: SecretStr | None = None
-    AZURE_SERVICE_BUS_NAMESPACE: str        = ""
+    AZURE_SERVICE_BUS_CONNECTION_STR: SecretStr | None = None  # local dev
+    AZURE_SERVICE_BUS_NAMESPACE: str        = ""               # prod (keyless)
     SB_QUEUE_INGESTION: str                 = "ingestion-tasks"
     SB_QUEUE_PROCESSING: str                = "processing-tasks"
     SB_QUEUE_EMBEDDING: str                 = "embedding-tasks"

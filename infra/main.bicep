@@ -31,12 +31,6 @@ param embeddingDeployment string = 'text-embedding-ada-002'
 @description('Light LLM deployment name for page cleaning')
 param lightLlmDeployment string = 'gpt-4o-mini'
 
-@description('Azure Document Intelligence endpoint')
-param documentIntelligenceEndpoint string
-
-@secure()
-param documentIntelligenceKey string
-
 @description('Azure AI Search endpoint (shared with retrieval pipeline)')
 param searchEndpoint string
 
@@ -199,8 +193,6 @@ var commonEnv = [
   { name: 'AZURE_FOUNDRY_PROJECT_ENDPOINT', value: azureFoundryProjectEndpoint }
   { name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT', value: embeddingDeployment }
   { name: 'AZURE_OPENAI_LIGHT_LLM_DEPLOYMENT', value: lightLlmDeployment }
-  { name: 'AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT', value: documentIntelligenceEndpoint }
-  { name: 'AZURE_DOCUMENT_INTELLIGENCE_KEY', secretRef: 'di-key' }
   { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storageAccount.name }
   { name: 'AZURE_SEARCH_ENDPOINT', value: searchEndpoint }
   { name: 'AZURE_SEARCH_API_KEY', secretRef: 'search-key' }
@@ -217,7 +209,6 @@ var commonEnv = [
 ]
 
 var commonSecrets = [
-  { name: 'di-key',    value: documentIntelligenceKey }
   { name: 'search-key', value: searchApiKey }
   { name: 'sp-secret', value: sharepointClientSecret }
 ]
