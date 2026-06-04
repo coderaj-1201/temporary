@@ -14,7 +14,6 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
-from azure.ai.projects import AIProjectClient
 from azure.core.credentials import AzureKeyCredential
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from azure.search.documents import SearchClient
@@ -32,17 +31,34 @@ def _credential():
 
 
 @lru_cache(maxsize=1)
-def get_foundry_client() -> AIProjectClient:
-    return AIProjectClient(
-        endpoint=str(settings.AZURE_FOUNDRY_PROJECT_ENDPOINT),
-        credential=_credential(),
-    )
-
-
-@lru_cache(maxsize=1)
 def get_openai_client() -> AzureOpenAI:
-    return get_foundry_client().inference.get_azure_openai_client(
-        api_version=settings.AZURE_OPENAI_API_VERSION
+    """
+    Returns AzureOpenAI client. Tries AIProjectClient.inference first,
+    falls back to direct endpoint if inference attr not available.
+    """
+    import logging, re
+    logger = logging.getLogger(__name__)
+    endpoint = str(settings.AZURE_FOUNDRY_PROJECT_ENDPOINT)
+
+    try:
+        from azure.ai.projects import AIProjectClient
+        client = AIProjectClient(endpoint=endpoint, credential=_credential())
+        if hasattr(client, "inference"):
+            return client.inference.get_azure_openai_client(
+                api_version=settings.AZURE_OPENAI_API_VERSION
+            )
+        logger.warning("azure-ai-projects .inference unavailable — using direct endpoint")
+    except Exception as exc:
+        logger.warning("AIProjectClient failed: %s", exc)
+
+    base_endpoint = re.sub(r"/api/projects/[^/]+/?$", "/", endpoint)
+    if not base_endpoint.endswith("/"):
+        base_endpoint += "/"
+    cred = _credential()
+    return AzureOpenAI(
+        azure_endpoint=base_endpoint,
+        azure_ad_token_provider=lambda: cred.get_token("https://cognitiveservices.azure.com/.default").token,
+        api_version=settings.AZURE_OPENAI_API_VERSION,
     )
 
 
